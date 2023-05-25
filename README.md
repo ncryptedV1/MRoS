@@ -1,6 +1,6 @@
 # MRoS
-MapReduce on Steroids - Project for Distributed Systems lecture at DHBW Karlsruhe
-*Spoilter*: This isn't actually a MapReduce implementation on steroids, which has multiple sensible reason:
+MapReduce on Steroids - Project for Distributed Systems lecture at DHBW Karlsruhe \
+*Spoiler*: This isn't actually a MapReduce implementation on steroids, which has multiple sensible reason:
 1. We don't support the use of drugs of any kind.
 2. The developers of known implementions such as Apache Hadoop are way more knowledgable of the topic and might've got a few more resources and time at their disposal.
 
