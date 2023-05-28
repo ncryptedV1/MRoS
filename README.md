@@ -16,5 +16,13 @@ Still, this project is a good visualization of the fundamental principle of MapR
     1. `python worker.py --host localhost --port 8001`
     2. `python worker.py --host localhost --port 8002`
 2. Start the master (again, ports can be chosen at will): `python master.py --host localhost --port 8000 --worker-hosts localhost localhost --worker-ports 8001 8002`
-3. Send your MapReduce-requests, such as shown in word counter example: `python word_counter.py`
+3. Send your MapReduce-requests, such as shown in the word counter example: `python word_counter.py`
 4. Enjoy, take a sip of your favorite coffee and wait for your results (if you actually spent time generating a sufficiently large example that you have to wait for an answer)!
+
+## Examples
+We've included two examples on how a MapReduce-request could be sent using our MapReduce prototype:
+- [`word_counter.py`](https://github.com/ncryptedV1/MRoS/blob/main/word_counter.py)
+- [`matrix_multiplication.py`](https://github.com/ncryptedV1/MRoS/blob/main/matrix_multiplication.py)
+
+The word counter is one of the most trivial examples for show-casing MapReduce.
+The matrix multiplication example on the other hand, is a bit more sophisticated as it requires two separate MapReduce-requests - one for retrieving all required cell products and the other for summing those products up for each cell in the final matrix.
