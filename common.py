@@ -1,6 +1,7 @@
-import dill as pickle
 import socket
 from typing import Any, Callable, List, Tuple
+
+import dill as pickle
 
 # Definiere die Typen für die Map- und Reduce-Funktionen
 MapFunction = Callable[[Any], List[Tuple[str, Any]]]
