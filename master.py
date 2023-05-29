@@ -1,29 +1,57 @@
 import argparse
+import signal
 import socket
 import threading
-from typing import Any, List, Tuple, Dict
+import subprocess
+import os
 
+from typing import Any, List, Dict
 from common import MapReduceRequest, send_data, receive_data
 
 
 class Master:
-    def __init__(self, ip: str, port: int, worker_addresses: List[Tuple[str, int]]):
+    def __init__(self, ip: str, port: int, worker_host: str, worker_amount: int):
         self.ip = ip
         self.port = port
-        self.worker_addresses = worker_addresses
+        self.worker_host = worker_host
+        self.worker_amount = worker_amount
+        self.workers = None
+        self.listener = None
+
+    def find_valid_worker_ports(self):
+        ports = list(range(8000, 8000 + self.worker_amount + 1))
+        ports.remove(self.port)
+        return ports[:self.worker_amount]
+
+    def start_workers(self):
+        ports = self.find_valid_worker_ports()
+        workers = []
+        for port in ports:
+            command = ["python3", "worker.py", "--host", self.worker_host, "--port", str(port)]
+            worker = subprocess.Popen(command, preexec_fn=os.setsid)
+            workers.append(worker)
+        self.workers = list(zip(workers, ports))
+
+    def terminate_workers(self):
+        for worker in self.workers:
+            os.killpg(os.getpgid(worker[0].pid), signal.SIGTERM)
 
     def start(self):
-        # Öffne Server-Socket
-        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_socket.bind((self.ip, self.port))
-        self.server_socket.listen(5)
-        print(f"Master listening on {self.ip}:{self.port}")
+        self.start_workers()
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as self.listener:
+            self.listener.bind((self.ip, self.port))
+            self.listener.listen(5)
+            print(f"Master is now listening on {self.ip}:{self.port}")
 
-        # Warte auf Client-Anfrage
-        while True:
-            client_socket, client_addr = self.server_socket.accept()
-            print(f"Accepted connection from {client_addr}")
-            threading.Thread(target=self.handle_client, args=(client_socket,)).start()
+            try:
+                while True:
+                    client, address = self.listener.accept()
+                    print(f"Client connection from {address[0]}:{address[1]} accepted")
+                    threading.Thread(target=self.handle_client, args=(client,)).start()
+            except KeyboardInterrupt:
+                self.terminate_workers()
+            finally:
+                self.listener.close()
 
     def handle_client(self, client_socket: socket.socket):
         # Nehme Client-Anfrage entgegen und beginne MapReduce-Prozess
@@ -37,15 +65,16 @@ class Master:
 
     def distribute_work(self, request: MapReduceRequest):
         # Teile die Daten auf und sende sie an die Worker
-        chunk_size = len(request.data) // len(self.worker_addresses)
+        chunk_count = min(len(self.workers), len(request.data))
+        chunk_size = len(request.data) // chunk_count
         chunks = [request.data[i:i + chunk_size] for i in range(0, len(request.data), chunk_size)]
 
         # Sammle die Map-Ergebnisse von den Workern
         map_results = []
         for idx, chunk in enumerate(chunks):
-            worker_ip, worker_port = self.worker_addresses[idx]
+            worker_port = self.workers[idx][1]
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as worker_socket:
-                worker_socket.connect((worker_ip, worker_port))
+                worker_socket.connect((self.worker_host, worker_port))
                 send_data(worker_socket, (request.functions.map_func, chunk))
                 map_results.extend(receive_data(worker_socket))
 
@@ -59,9 +88,9 @@ class Master:
         # Verteile die gruppierten Key-Value-Paare an die Worker und sammle die Reduce-Ergebnisse
         reduce_results = []
         for idx, (key, values) in enumerate(shuffle_dict.items()):
-            worker_ip, worker_port = self.worker_addresses[idx % len(self.worker_addresses)]
+            worker_port = self.workers[idx % len(self.workers)][1]
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as worker_socket:
-                worker_socket.connect((worker_ip, worker_port))
+                worker_socket.connect((self.worker_host, worker_port))
                 send_data(worker_socket, (request.functions.reduce_func, key, values))
                 reduce_results.append(receive_data(worker_socket))
 
@@ -72,14 +101,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Start a MapReduce Master")
     parser.add_argument('--host', type=str, default='localhost', help='Host for the master')
     parser.add_argument('--port', type=int, default=8000, help='Port for the master')
-    parser.add_argument('--worker-hosts', type=str, nargs='+', help='List of worker hosts')
-    parser.add_argument('--worker-ports', type=int, nargs='+', help='List of worker ports')
+    parser.add_argument('--worker-host', type=str, default='localhost', help='Host of workers')
+    parser.add_argument('--worker-amount', type=int, default=5, help='Amount of workers')
     args = parser.parse_args()
 
-    if len(args.worker_hosts) != len(args.worker_ports):
-        raise ValueError("The number of worker hosts and ports must be the same")
-
-    worker_addresses = list(zip(args.worker_hosts, args.worker_ports))
-
-    master = Master(args.host, args.port, worker_addresses)
+    master = Master(args.host, args.port, args.worker_host, args.worker_amount)
     master.start()

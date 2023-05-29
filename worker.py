@@ -12,17 +12,20 @@ class Worker:
 
     def start(self):
         # Öffne Server-Socket
-        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_socket.bind((self.ip, self.port))
-        self.server_socket.listen(5)
-        print(f"Worker listening on {self.ip}:{self.port}")
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as self.server_socket:
+            self.server_socket.bind((self.ip, self.port))
+            self.server_socket.listen(5)
+            print(f"Worker listening on {self.ip}:{self.port}")
 
-        # Warte auf Master-Anfrage
-        while True:
-            master_socket, master_addr = self.server_socket.accept()
-            print(f"Accepted connection from {master_addr}")
-            self.process_request(master_socket)
-            master_socket.close()
+            try:
+                # Warte auf Master-Anfrage
+                while True:
+                    master_socket, master_addr = self.server_socket.accept()
+                    print(f"Accepted connection from {master_addr}")
+                    self.process_request(master_socket)
+                    master_socket.close()
+            finally:
+                self.server_socket.close()
 
     def process_request(self, master_socket: socket.socket) -> Any:
         # Empfange die Anfrage vom Master
