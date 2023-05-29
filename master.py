@@ -42,6 +42,7 @@ class Master:
     def start(self):
         self.start_workers()
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as self.listener:
+            self.listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.listener.bind((self.ip, self.port))
             self.listener.listen(5)
             print(f"Master is now listening on {self.ip}:{self.port}")

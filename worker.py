@@ -13,6 +13,7 @@ class Worker:
     def start(self):
         # Öffne Server-Socket
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as self.server_socket:
+            self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.server_socket.bind((self.ip, self.port))
             self.server_socket.listen(5)
             print(f"Worker listening on {self.ip}:{self.port}")
