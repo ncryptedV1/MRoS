@@ -60,12 +60,12 @@ class Master:
     def handle_client(self, client_socket: socket.socket) -> None:
         request = receive_data(client_socket)
         if request:
-            client_address = client_socket.getpeername()
-            print(f"Processing request of {client_address}")
+            address = client_socket.getpeername()
+            print(f"Processing request of {address[0]}:{address[1]}")
             mapped = self.map(request)
             shuffled = self.shuffle(mapped)
             reduced = self.reduce(request, shuffled)
-            print(f"Finished request of {client_address}")
+            print(f"Finished request of {address[0]}:{address[1]}")
             send_data(client_socket, reduced)
         client_socket.close()
 
