@@ -1,7 +1,7 @@
 import argparse
 import socket
 
-from typing import Any, Callable, Tuple
+from typing import Any, Callable, Tuple, List
 from common import MapFunction, ReduceFunction, send_data, receive_data
 
 
@@ -11,7 +11,7 @@ class Worker:
         self.port = port
         self.listener = None
 
-    def start(self):
+    def start(self) -> None:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as self.listener:
             self.listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.listener.bind((self.ip, self.port))
@@ -47,10 +47,10 @@ class Worker:
 
         send_data(master, result)
 
-    def map(self, function: MapFunction, data) -> Any:
+    def map(self, function: MapFunction, chunk: List[Any]) -> List[Any]:
         results = []
-        for chunk in data:
-            mapped = function(chunk)
+        for fragment in chunk:
+            mapped = function(fragment)
             results.extend(mapped)
         return results
 

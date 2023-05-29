@@ -21,12 +21,12 @@ class Master:
         self.workers = None
         self.listener = None
 
-    def find_valid_worker_ports(self):
+    def find_valid_worker_ports(self) -> List[int]:
         ports = list(range(8000, 8000 + self.worker_amount + 1))
         ports.remove(self.port)
         return ports[:self.worker_amount]
 
-    def start_workers(self):
+    def start_workers(self) -> None:
         ports = self.find_valid_worker_ports()
         workers = []
         for port in ports:
@@ -35,11 +35,11 @@ class Master:
             workers.append(worker)
         self.workers = list(zip(workers, ports))
 
-    def terminate_workers(self):
+    def terminate_workers(self) -> None:
         for worker in self.workers:
             os.killpg(os.getpgid(worker[0].pid), signal.SIGTERM)
 
-    def start(self):
+    def start(self) -> None:
         self.start_workers()
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as self.listener:
             self.listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -57,7 +57,7 @@ class Master:
             finally:
                 self.listener.close()
 
-    def handle_client(self, client_socket: socket.socket):
+    def handle_client(self, client_socket: socket.socket) -> None:
         request = receive_data(client_socket)
         if request:
             client_address = client_socket.getpeername()
@@ -80,7 +80,7 @@ class Master:
             chunks.append(chunk)
         return chunks
 
-    def map(self, request: MapReduceRequest):
+    def map(self, request: MapReduceRequest) -> List[Any]:
         chunks = self.chunk(request)
         mapped = []
         for i, chunk in enumerate(chunks):
@@ -91,7 +91,7 @@ class Master:
                 mapped.extend(receive_data(worker_socket))
         return mapped
 
-    def shuffle(self, map_result: List[Tuple[Any, Any]]):
+    def shuffle(self, map_result: List[Tuple[Any, Any]]) -> Dict[str, List[Any]]:
         shuffled: Dict[str, List[Any]] = {}
         for key, value in map_result:
             if key not in shuffled:
@@ -99,7 +99,7 @@ class Master:
             shuffled[key].append(value)
         return shuffled
 
-    def reduce(self, request: MapReduceRequest, shuffled: Dict[str, List[Any]]):
+    def reduce(self, request: MapReduceRequest, shuffled: Dict[str, List[Any]]) -> Any:
         reduced = []
         for idx, (key, values) in enumerate(shuffled.items()):
             worker_port = self.workers[idx % len(self.workers)][1]
@@ -110,7 +110,7 @@ class Master:
         return reduced
 
 
-def validate_worker_amount(amount):
+def validate_worker_amount(amount) -> str:
     if MIN_WORKER_AMOUNT <= int(amount) <= MAX_WORKER_AMOUNT:
         return amount
     else:
