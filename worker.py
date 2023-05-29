@@ -1,7 +1,7 @@
 import argparse
 import socket
-from typing import Any, Callable, Tuple
 
+from typing import Any, Callable, Tuple
 from common import MapFunction, ReduceFunction, send_data, receive_data
 
 
@@ -9,58 +9,53 @@ class Worker:
     def __init__(self, ip: str, port: int):
         self.ip = ip
         self.port = port
+        self.listener = None
 
     def start(self):
-        # Öffne Server-Socket
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as self.server_socket:
-            self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.server_socket.bind((self.ip, self.port))
-            self.server_socket.listen(5)
-            print(f"Worker listening on {self.ip}:{self.port}")
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as self.listener:
+            self.listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.listener.bind((self.ip, self.port))
+            self.listener.listen(5)
+            print(f"Worker is listening on {self.ip}:{self.port}")
 
             try:
-                # Warte auf Master-Anfrage
                 while True:
-                    master_socket, master_addr = self.server_socket.accept()
-                    print(f"Accepted connection from {master_addr}")
-                    self.process_request(master_socket)
-                    master_socket.close()
+                    master, address = self.listener.accept()
+                    print(f"Master connection from {address[0]}:{address[1]} accepted")
+                    self.process(master)
+                    master.close()
             finally:
-                self.server_socket.close()
+                self.listener.close()
 
-    def process_request(self, master_socket: socket.socket) -> Any:
-        # Empfange die Anfrage vom Master
-        request = receive_data(master_socket)
+    def process(self, master: socket.socket) -> Any:
+        request = receive_data(master)
         if not request:
             return
 
-        # Überprüfe, ob es sich um eine Map- oder Reduce-Funktion handelt
         if isinstance(request[0], Callable) and len(request) == 2:
             map_func: MapFunction = request[0]
             data_chunk = request[1]
-            result = self.execute_map(map_func, data_chunk)
+            result = self.map(map_func, data_chunk)
         elif isinstance(request[0], Callable) and len(request) == 3:
             reduce_func: ReduceFunction = request[0]
             key = request[1]
             values = request[2]
-            result = self.execute_reduce(reduce_func, key, values)
+            result = self.reduce(reduce_func, key, values)
         else:
             print("Invalid request")
             return
 
-        # Sende das Ergebnis zurück an den Master
-        send_data(master_socket, result)
+        send_data(master, result)
 
-    def execute_map(self, map_func: MapFunction, data_chunk) -> Any:
-        # Führe die Map-Funktion auf dem Daten-Chunk aus
-        map_results = []
-        for item in data_chunk:
-            map_results.extend(map_func(item))
-        return map_results
+    def map(self, function: MapFunction, data) -> Any:
+        results = []
+        for chunk in data:
+            mapped = function(chunk)
+            results.extend(mapped)
+        return results
 
-    def execute_reduce(self, reduce_func: ReduceFunction, key, values) -> Tuple[str, Any]:
-        # Führe die Reduce-Funktion auf den gruppierten Key-Value-Paaren aus
-        return reduce_func(key, values)
+    def reduce(self, function: ReduceFunction, key, values) -> Tuple[str, Any]:
+        return function(key, values)
 
 
 if __name__ == "__main__":

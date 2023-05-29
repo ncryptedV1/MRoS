@@ -45,7 +45,7 @@ class Master:
             self.listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.listener.bind((self.ip, self.port))
             self.listener.listen(5)
-            print(f"Master is now listening on {self.ip}:{self.port}")
+            print(f"Master is listening on {self.ip}:{self.port}")
 
             try:
                 while True:
