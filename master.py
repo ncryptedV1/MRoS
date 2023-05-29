@@ -5,7 +5,7 @@ import threading
 import subprocess
 import os
 
-from typing import Any, List, Dict
+from typing import Any, List, Dict, Tuple
 from common import MapReduceRequest, send_data, receive_data
 
 MIN_WORKER_AMOUNT = 1
@@ -57,47 +57,56 @@ class Master:
                 self.listener.close()
 
     def handle_client(self, client_socket: socket.socket):
-        # Nehme Client-Anfrage entgegen und beginne MapReduce-Prozess
         request = receive_data(client_socket)
         if request:
-            print(f"Distributing work from request of {client_socket.getpeername()}")
-            result = self.distribute_work(request)
-            print(f"Finished MapReduce for request of {client_socket.getpeername()}. Sending results to client.")
-            send_data(client_socket, result)
+            client_address = client_socket.getpeername()
+            print(f"Processing request of {client_address}")
+            mapped = self.map(request)
+            shuffled = self.shuffle(mapped)
+            reduced = self.reduce(request, shuffled)
+            print(f"Finished request of {client_address}")
+            send_data(client_socket, reduced)
         client_socket.close()
 
-    def distribute_work(self, request: MapReduceRequest):
-        # Teile die Daten auf und sende sie an die Worker
-        chunk_count = min(len(self.workers), len(request.data))
-        chunk_size = len(request.data) // chunk_count
-        chunks = [request.data[i:i + chunk_size] for i in range(0, len(request.data), chunk_size)]
+    def chunk(self, request: MapReduceRequest):
+        request_size = len(request.data)
+        chunk_count = min(len(self.workers), request_size)
+        chunk_size = request_size // chunk_count
 
-        # Sammle die Map-Ergebnisse von den Workern
-        map_results = []
-        for idx, chunk in enumerate(chunks):
-            worker_port = self.workers[idx][1]
+        chunks = []
+        for i in range(0, request_size, chunk_size):
+            chunk = request.data[i:i + chunk_size]
+            chunks.append(chunk)
+        return chunks
+
+    def map(self, request: MapReduceRequest):
+        chunks = self.chunk(request)
+        mapped = []
+        for i, chunk in enumerate(chunks):
+            worker_port = self.workers[i][1]
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as worker_socket:
                 worker_socket.connect((self.worker_host, worker_port))
                 send_data(worker_socket, (request.functions.map_func, chunk))
-                map_results.extend(receive_data(worker_socket))
+                mapped.extend(receive_data(worker_socket))
+        return mapped
 
-        # Shuffle und sortiere die Key-Value-Paare
-        shuffle_dict: Dict[str, List[Any]] = {}
-        for key, value in map_results:
-            if key not in shuffle_dict:
-                shuffle_dict[key] = []
-            shuffle_dict[key].append(value)
+    def shuffle(self, map_result: List[Tuple[Any, Any]]):
+        shuffled: Dict[str, List[Any]] = {}
+        for key, value in map_result:
+            if key not in shuffled:
+                shuffled[key] = []
+            shuffled[key].append(value)
+        return shuffled
 
-        # Verteile die gruppierten Key-Value-Paare an die Worker und sammle die Reduce-Ergebnisse
-        reduce_results = []
-        for idx, (key, values) in enumerate(shuffle_dict.items()):
+    def reduce(self, request: MapReduceRequest, shuffled: Dict[str, List[Any]]):
+        reduced = []
+        for idx, (key, values) in enumerate(shuffled.items()):
             worker_port = self.workers[idx % len(self.workers)][1]
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as worker_socket:
                 worker_socket.connect((self.worker_host, worker_port))
                 send_data(worker_socket, (request.functions.reduce_func, key, values))
-                reduce_results.append(receive_data(worker_socket))
-
-        return reduce_results
+                reduced.append(receive_data(worker_socket))
+        return reduced
 
 
 def validate_worker_amount(amount):
