@@ -8,13 +8,16 @@ import os
 from typing import Any, List, Dict
 from common import MapReduceRequest, send_data, receive_data
 
+MIN_WORKER_AMOUNT = 1
+MAX_WORKER_AMOUNT = 20
+
 
 class Master:
     def __init__(self, ip: str, port: int, worker_host: str, worker_amount: int):
         self.ip = ip
         self.port = port
         self.worker_host = worker_host
-        self.worker_amount = worker_amount
+        self.worker_amount = int(worker_amount)
         self.workers = None
         self.listener = None
 
@@ -97,12 +100,19 @@ class Master:
         return reduce_results
 
 
+def validate_worker_amount(amount):
+    if MIN_WORKER_AMOUNT <= int(amount) <= MAX_WORKER_AMOUNT:
+        return amount
+    else:
+        raise argparse.ArgumentTypeError(f"Worker amount must be between {MIN_WORKER_AMOUNT} and {MAX_WORKER_AMOUNT}")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Start a MapReduce Master")
     parser.add_argument('--host', type=str, default='localhost', help='Host for the master')
     parser.add_argument('--port', type=int, default=8000, help='Port for the master')
     parser.add_argument('--worker-host', type=str, default='localhost', help='Host of workers')
-    parser.add_argument('--worker-amount', type=int, default=5, help='Amount of workers')
+    parser.add_argument('--worker-amount', type=validate_worker_amount, default=5, help='Amount of workers')
     args = parser.parse_args()
 
     master = Master(args.host, args.port, args.worker_host, args.worker_amount)
