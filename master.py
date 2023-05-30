@@ -106,23 +106,31 @@ class Master:
                 mapped.extend(result)
         return mapped
 
-    def shuffle(self, map_result: List[Tuple[Any, Any]]) -> Dict[str, List[Any]]:
+    def shuffle(self, map_result: List[Tuple[Any, Any]]) -> List[Any]:
         shuffled: Dict[str, List[Any]] = {}
         for key, value in map_result:
             if key not in shuffled:
                 shuffled[key] = []
             shuffled[key].append(value)
-        return shuffled
+        return list(shuffled.items())
 
-    def reduce(self, request: MapReduceRequest, shuffled: Dict[str, List[Any]]) -> Any:
+    def reduce_chunk(self, host: str, port: int, chunk: Any, function: MapFunction) -> List[Any]:
+        data = (RequestType.REDUCE, function, chunk)
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as worker:
+            worker.connect((host, port))
+            send_data(worker, data)
+            return receive_data(worker)
+
+    def reduce(self, request: MapReduceRequest, shuffled: List[Any]) -> Any:
+        chunks = self.chunk(shuffled)
         reduced = []
-        for idx, (key, values) in enumerate(shuffled.items()):
-            worker_port = self.workers[idx % len(self.workers)][1]
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as worker_socket:
-                worker_socket.connect((self.worker_host, worker_port))
-                data = (RequestType.REDUCE, request.functions.reduce_func, key, values)
-                send_data(worker_socket, data)
-                reduced.append(receive_data(worker_socket))
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            hosts = [self.worker_host] * len(chunks)
+            ports = [self.workers[i][1] for i in range(len(chunks))]
+            functions = [request.functions.reduce_func] * len(chunks)
+            results = executor.map(self.reduce_chunk, hosts, ports, chunks, functions)
+            for result in results:
+                reduced.extend(result)
         return reduced
 
 

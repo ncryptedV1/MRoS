@@ -39,9 +39,8 @@ class Worker:
             result = self.map(map_func, data_chunk)
         elif request_type == RequestType.REDUCE:
             reduce_func: ReduceFunction = request[1]
-            key = request[2]
-            values = request[3]
-            result = self.reduce(reduce_func, key, values)
+            data_chunk = request[2]
+            result = self.reduce(reduce_func, data_chunk)
         else:
             print("Invalid request")
             return
@@ -55,8 +54,13 @@ class Worker:
             results.extend(mapped)
         return results
 
-    def reduce(self, function: ReduceFunction, key, values) -> Tuple[str, Any]:
-        return function(key, values)
+    def reduce(self, function: ReduceFunction, chunk: List[Any]) -> List[Any]:
+        results = []
+        print(chunk)
+        for key, value in chunk:
+            reduced = function(key, value)
+            results.append(reduced)
+        return results
 
 
 if __name__ == "__main__":
