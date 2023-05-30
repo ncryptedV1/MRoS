@@ -1,7 +1,7 @@
 import argparse
 import socket
-
 from typing import Any, List
+
 from common import MapFunction, ReduceFunction, send_data, receive_data, RequestType
 
 

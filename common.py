@@ -1,8 +1,6 @@
-import dill as pickle
 import socket
-
-from typing import Any, Callable, List, Tuple
 from enum import Enum, auto
+from typing import Any, Callable, List, Tuple
 
 import dill as pickle
 

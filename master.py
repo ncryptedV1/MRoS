@@ -1,14 +1,12 @@
 import argparse
 import concurrent
-import signal
 import socket
-import threading
 import subprocess
-import os
-
-from typing import Any, List, Dict, Tuple
-from common import MapFunction, MapReduceRequest, send_data, receive_data, RequestType, ReduceFunction
+import threading
 from concurrent import futures
+from typing import Any, List, Dict, Tuple
+
+from common import MapFunction, MapReduceRequest, send_data, receive_data, RequestType, ReduceFunction
 
 MIN_WORKER_AMOUNT = 1
 MAX_WORKER_AMOUNT = 20
@@ -39,32 +37,45 @@ def map_chunk(host: str, port: int, chunk: Any, function: MapFunction) -> List[A
         return receive_data(worker)
 
 
+def is_port_in_use(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(10.0)
+        return s.connect_ex(('localhost', port)) == 0
+
+
 class Master:
     def __init__(self, ip: str, port: int, worker_host: str, worker_amount: int):
         self.ip: str = ip
         self.port: int = port
         self.worker_host: str = worker_host
         self.worker_amount: int = int(worker_amount)
-        self.workers: List[Tuple[Any, Any]] = None
+        self.workers: List[Tuple[subprocess.Popen[str], int]] = None
         self.listener: socket.socket = None
 
     def find_valid_worker_ports(self) -> List[int]:
-        ports = list(range(8000, 8000 + self.worker_amount + 1))
-        ports.remove(self.port)
-        return ports[:self.worker_amount]
+        ports = []
+        cur_port = 7999
+        while len(ports) < self.worker_amount:
+            cur_port += 1
+            if cur_port == self.port or is_port_in_use(cur_port):
+                continue
+            ports.append(cur_port)
+        return ports
 
     def start_workers(self) -> None:
+        print("Looking for worker ports...")
         ports = self.find_valid_worker_ports()
+        print(f"Found open ports for workers: {', '.join(str(x) for x in ports)}")
         workers = []
         for port in ports:
-            command = ["python3", "worker.py", "--host", self.worker_host, "--port", str(port)]
-            worker = subprocess.Popen(command, preexec_fn=os.setsid)
+            command = ["python", "worker.py", "--host", self.worker_host, "--port", str(port)]
+            worker = subprocess.Popen(command)
             workers.append(worker)
         self.workers = list(zip(workers, ports))
 
     def terminate_workers(self) -> None:
         for worker in self.workers:
-            os.killpg(os.getpgid(worker[0].pid), signal.SIGTERM)
+            worker[0].terminate()
 
     def start(self) -> None:
         self.start_workers()

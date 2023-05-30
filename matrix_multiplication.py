@@ -1,8 +1,6 @@
 import socket
 from typing import List, Tuple
 
-import numpy
-
 from common import MapReduceFunctions, MapReduceRequest, send_data, receive_data
 
 
