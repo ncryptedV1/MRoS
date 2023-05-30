@@ -1,4 +1,5 @@
 import argparse
+import concurrent
 import signal
 import socket
 import threading
@@ -6,7 +7,8 @@ import subprocess
 import os
 
 from typing import Any, List, Dict, Tuple
-from common import MapReduceRequest, send_data, receive_data, RequestType
+from common import MapFunction, MapReduceRequest, send_data, receive_data, RequestType
+from concurrent import futures
 
 MIN_WORKER_AMOUNT = 1
 MAX_WORKER_AMOUNT = 20
@@ -80,16 +82,23 @@ class Master:
             chunks.append(chunk)
         return chunks
 
+    def map_chunk(self, host: str, port: int, chunk: Any, function: MapFunction) -> List[Any]:
+        data = (RequestType.MAP, function, chunk)
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as worker:
+            worker.connect((host, port))
+            send_data(worker, data)
+            return receive_data(worker)
+
     def map(self, request: MapReduceRequest) -> List[Any]:
         chunks = self.chunk(request)
         mapped = []
-        for i, chunk in enumerate(chunks):
-            worker_port = self.workers[i][1]
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as worker_socket:
-                worker_socket.connect((self.worker_host, worker_port))
-                data = (RequestType.MAP, request.functions.map_func, chunk)
-                send_data(worker_socket, data)
-                mapped.extend(receive_data(worker_socket))
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            hosts = [self.worker_host] * len(chunks)
+            ports = [self.workers[i][1] for i in range(len(chunks))]
+            functions = [request.functions.map_func] * len(chunks)
+            results = executor.map(self.map_chunk, hosts, ports, chunks, functions)
+            for result in results:
+                mapped.extend(result)
         return mapped
 
     def shuffle(self, map_result: List[Tuple[Any, Any]]) -> Dict[str, List[Any]]:
