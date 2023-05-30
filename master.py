@@ -14,12 +14,12 @@ MAX_WORKER_AMOUNT = 20
 
 class Master:
     def __init__(self, ip: str, port: int, worker_host: str, worker_amount: int):
-        self.ip = ip
-        self.port = port
-        self.worker_host = worker_host
-        self.worker_amount = int(worker_amount)
-        self.workers = None
-        self.listener = None
+        self.ip: str = ip
+        self.port: int = port
+        self.worker_host: str = worker_host
+        self.worker_amount: int = int(worker_amount)
+        self.workers: List[Tuple[Any, Any]] = None
+        self.listener: socket.socket = None
 
     def find_valid_worker_ports(self) -> List[int]:
         ports = list(range(8000, 8000 + self.worker_amount + 1))

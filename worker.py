@@ -7,9 +7,9 @@ from common import MapFunction, ReduceFunction, send_data, receive_data, Request
 
 class Worker:
     def __init__(self, ip: str, port: int):
-        self.ip = ip
-        self.port = port
-        self.listener = None
+        self.ip: str = ip
+        self.port: int = port
+        self.listener: socket.socket = None
 
     def start(self) -> None:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as self.listener:
@@ -21,7 +21,7 @@ class Worker:
             try:
                 while True:
                     master, address = self.listener.accept()
-                    print(f"Master connection from {address[0]}:{address[1]} accepted")
+                    print(f"Connection from {address[0]}:{address[1]} accepted")
                     self.process(master)
                     master.close()
             finally:
