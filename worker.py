@@ -1,7 +1,7 @@
 import argparse
 import socket
 
-from typing import Any, Tuple, List
+from typing import Any, List
 from common import MapFunction, ReduceFunction, send_data, receive_data, RequestType
 
 
@@ -32,17 +32,13 @@ class Worker:
         if not request:
             return
 
-        request_type = request[0]
-        if request_type == RequestType.MAP:
-            map_func: MapFunction = request[1]
-            data_chunk = request[2]
-            result = self.map(map_func, data_chunk)
-        elif request_type == RequestType.REDUCE:
-            reduce_func: ReduceFunction = request[1]
-            data_chunk = request[2]
-            result = self.reduce(reduce_func, data_chunk)
+        type, function, data = request
+        if type == RequestType.MAP:
+            result = self.map(function, data)
+        elif type == RequestType.REDUCE:
+            result = self.reduce(function, data)
         else:
-            print("Invalid request")
+            print(f"Invalid request type {type}")
             return
 
         send_data(master, result)
@@ -56,7 +52,6 @@ class Worker:
 
     def reduce(self, function: ReduceFunction, chunk: List[Any]) -> List[Any]:
         results = []
-        print(chunk)
         for key, value in chunk:
             reduced = function(key, value)
             results.append(reduced)

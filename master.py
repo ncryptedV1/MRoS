@@ -7,7 +7,7 @@ import subprocess
 import os
 
 from typing import Any, List, Dict, Tuple
-from common import MapFunction, MapReduceRequest, send_data, receive_data, RequestType
+from common import MapFunction, MapReduceRequest, send_data, receive_data, RequestType, ReduceFunction
 from concurrent import futures
 
 MIN_WORKER_AMOUNT = 1
@@ -23,7 +23,7 @@ def shuffle(map_result: List[Tuple[Any, Any]]) -> List[Any]:
     return list(shuffled.items())
 
 
-def reduce_chunk(host: str, port: int, chunk: Any, function: MapFunction) -> List[Any]:
+def reduce_chunk(host: str, port: int, chunk: Any, function: ReduceFunction) -> List[Any]:
     data = (RequestType.REDUCE, function, chunk)
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as worker:
         worker.connect((host, port))
