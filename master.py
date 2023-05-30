@@ -71,14 +71,19 @@ class Master:
             send_data(client_socket, reduced)
         client_socket.close()
 
-    def chunk(self, request: MapReduceRequest):
-        request_size = len(request.data)
-        chunk_count = min(len(self.workers), request_size)
-        chunk_size = request_size // chunk_count
+    def chunk(self, data: List[Any]):
+        fragment_count = len(data)
+        worker_count = len(self.workers)
+        chunk_count = min(worker_count, fragment_count)
+        chunk_size = fragment_count // chunk_count
 
         chunks = []
-        for i in range(0, request_size, chunk_size):
-            chunk = request.data[i:i + chunk_size]
+        for i in range(0, worker_count):
+            start = i * chunk_size
+            if i == worker_count - 1:
+                chunk = data[start:]
+            else:
+                chunk = data[start:start + chunk_size]
             chunks.append(chunk)
         return chunks
 
@@ -90,7 +95,7 @@ class Master:
             return receive_data(worker)
 
     def map(self, request: MapReduceRequest) -> List[Any]:
-        chunks = self.chunk(request)
+        chunks = self.chunk(request.data)
         mapped = []
         with concurrent.futures.ThreadPoolExecutor() as executor:
             hosts = [self.worker_host] * len(chunks)
