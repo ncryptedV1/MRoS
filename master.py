@@ -14,6 +14,31 @@ MIN_WORKER_AMOUNT = 1
 MAX_WORKER_AMOUNT = 20
 
 
+def shuffle(map_result: List[Tuple[Any, Any]]) -> List[Any]:
+    shuffled: Dict[str, List[Any]] = {}
+    for key, value in map_result:
+        if key not in shuffled:
+            shuffled[key] = []
+        shuffled[key].append(value)
+    return list(shuffled.items())
+
+
+def reduce_chunk(host: str, port: int, chunk: Any, function: MapFunction) -> List[Any]:
+    data = (RequestType.REDUCE, function, chunk)
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as worker:
+        worker.connect((host, port))
+        send_data(worker, data)
+        return receive_data(worker)
+
+
+def map_chunk(host: str, port: int, chunk: Any, function: MapFunction) -> List[Any]:
+    data = (RequestType.MAP, function, chunk)
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as worker:
+        worker.connect((host, port))
+        send_data(worker, data)
+        return receive_data(worker)
+
+
 class Master:
     def __init__(self, ip: str, port: int, worker_host: str, worker_amount: int):
         self.ip: str = ip
@@ -65,7 +90,7 @@ class Master:
             address = client_socket.getpeername()
             print(f"Processing request of {address[0]}:{address[1]}")
             mapped = self.map(request)
-            shuffled = self.shuffle(mapped)
+            shuffled = shuffle(mapped)
             reduced = self.reduce(request, shuffled)
             print(f"Finished request of {address[0]}:{address[1]}")
             send_data(client_socket, reduced)
@@ -87,13 +112,6 @@ class Master:
             chunks.append(chunk)
         return chunks
 
-    def map_chunk(self, host: str, port: int, chunk: Any, function: MapFunction) -> List[Any]:
-        data = (RequestType.MAP, function, chunk)
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as worker:
-            worker.connect((host, port))
-            send_data(worker, data)
-            return receive_data(worker)
-
     def map(self, request: MapReduceRequest) -> List[Any]:
         chunks = self.chunk(request.data)
         mapped = []
@@ -101,25 +119,10 @@ class Master:
             hosts = [self.worker_host] * len(chunks)
             ports = [self.workers[i][1] for i in range(len(chunks))]
             functions = [request.functions.map_func] * len(chunks)
-            results = executor.map(self.map_chunk, hosts, ports, chunks, functions)
+            results = executor.map(map_chunk, hosts, ports, chunks, functions)
             for result in results:
                 mapped.extend(result)
         return mapped
-
-    def shuffle(self, map_result: List[Tuple[Any, Any]]) -> List[Any]:
-        shuffled: Dict[str, List[Any]] = {}
-        for key, value in map_result:
-            if key not in shuffled:
-                shuffled[key] = []
-            shuffled[key].append(value)
-        return list(shuffled.items())
-
-    def reduce_chunk(self, host: str, port: int, chunk: Any, function: MapFunction) -> List[Any]:
-        data = (RequestType.REDUCE, function, chunk)
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as worker:
-            worker.connect((host, port))
-            send_data(worker, data)
-            return receive_data(worker)
 
     def reduce(self, request: MapReduceRequest, shuffled: List[Any]) -> Any:
         chunks = self.chunk(shuffled)
@@ -128,7 +131,7 @@ class Master:
             hosts = [self.worker_host] * len(chunks)
             ports = [self.workers[i][1] for i in range(len(chunks))]
             functions = [request.functions.reduce_func] * len(chunks)
-            results = executor.map(self.reduce_chunk, hosts, ports, chunks, functions)
+            results = executor.map(reduce_chunk, hosts, ports, chunks, functions)
             for result in results:
                 reduced.extend(result)
         return reduced
