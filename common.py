@@ -1,11 +1,19 @@
+import dill as pickle
 import socket
+
 from typing import Any, Callable, List, Tuple
+from enum import Enum, auto
 
 import dill as pickle
 
 # Definiere die Typen für die Map- und Reduce-Funktionen
 MapFunction = Callable[[Any], List[Tuple[str, Any]]]
 ReduceFunction = Callable[[str, List[Any]], Tuple[str, Any]]
+
+
+class RequestType(Enum):
+    MAP = auto()
+    REDUCE = auto()
 
 
 class MapReduceFunctions:
@@ -20,7 +28,6 @@ class MapReduceRequest:
         self.functions = functions
 
 
-# Hilfsfunktionen zum Senden und Empfangen von Daten über Sockets
 def send_data(sock: socket.socket, data: Any) -> None:
     serialized_data = pickle.dumps(data)
     sock.sendall(len(serialized_data).to_bytes(4, 'big'))

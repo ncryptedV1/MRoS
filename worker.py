@@ -1,8 +1,8 @@
 import argparse
 import socket
 
-from typing import Any, Callable, Tuple, List
-from common import MapFunction, ReduceFunction, send_data, receive_data
+from typing import Any, Tuple, List
+from common import MapFunction, ReduceFunction, send_data, receive_data, RequestType
 
 
 class Worker:
@@ -32,14 +32,15 @@ class Worker:
         if not request:
             return
 
-        if isinstance(request[0], Callable) and len(request) == 2:
-            map_func: MapFunction = request[0]
-            data_chunk = request[1]
+        request_type = request[0]
+        if request_type == RequestType.MAP:
+            map_func: MapFunction = request[1]
+            data_chunk = request[2]
             result = self.map(map_func, data_chunk)
-        elif isinstance(request[0], Callable) and len(request) == 3:
-            reduce_func: ReduceFunction = request[0]
-            key = request[1]
-            values = request[2]
+        elif request_type == RequestType.REDUCE:
+            reduce_func: ReduceFunction = request[1]
+            key = request[2]
+            values = request[3]
             result = self.reduce(reduce_func, key, values)
         else:
             print("Invalid request")

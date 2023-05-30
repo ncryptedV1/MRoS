@@ -6,7 +6,7 @@ import subprocess
 import os
 
 from typing import Any, List, Dict, Tuple
-from common import MapReduceRequest, send_data, receive_data
+from common import MapReduceRequest, send_data, receive_data, RequestType
 
 MIN_WORKER_AMOUNT = 1
 MAX_WORKER_AMOUNT = 20
@@ -87,7 +87,8 @@ class Master:
             worker_port = self.workers[i][1]
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as worker_socket:
                 worker_socket.connect((self.worker_host, worker_port))
-                send_data(worker_socket, (request.functions.map_func, chunk))
+                data = (RequestType.MAP, request.functions.map_func, chunk)
+                send_data(worker_socket, data)
                 mapped.extend(receive_data(worker_socket))
         return mapped
 
@@ -105,7 +106,8 @@ class Master:
             worker_port = self.workers[idx % len(self.workers)][1]
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as worker_socket:
                 worker_socket.connect((self.worker_host, worker_port))
-                send_data(worker_socket, (request.functions.reduce_func, key, values))
+                data = (RequestType.REDUCE, request.functions.reduce_func, key, values)
+                send_data(worker_socket, data)
                 reduced.append(receive_data(worker_socket))
         return reduced
 
